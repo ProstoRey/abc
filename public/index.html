@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ХЗР — Железнодорожная Касса | Honkai: Star Rail</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ -->
+<div id="authOverlay" class="auth-overlay">
+    <div class="auth-modal">
+        <div class="auth-header">
+            <h2>🚆 Добро пожаловать в ХЗР</h2>
+            <p>Войдите или зарегистрируйтесь, чтобы продолжить</p>
+        </div>
+        <div id="authError" class="auth-error"></div>
+        <div class="auth-tabs">
+            <button id="showLoginBtn" class="auth-tab active">🔐 Вход</button>
+            <button id="showRegisterBtn" class="auth-tab">📝 Регистрация</button>
+        </div>
+        <div id="loginForm" class="auth-form active">
+            <input type="text" id="loginUser" placeholder="Логин" class="auth-input">
+            <input type="password" id="loginPass" placeholder="Пароль" class="auth-input">
+            <button id="loginSubmitBtn" class="auth-submit">Войти</button>
+        </div>
+        <div id="registerForm" class="auth-form">
+            <input type="text" id="regUser" placeholder="Придумайте логин" class="auth-input">
+            <input type="password" id="regPass" placeholder="Придумайте пароль" class="auth-input">
+            <button id="regSubmitBtn" class="auth-submit">Зарегистрироваться</button>
+        </div>
+    </div>
+</div>
+
+<!-- ОСНОВНОЙ САЙТ -->
+<div id="mainApp" class="app" style="display: none;">
+    <div class="header">
+        <div class="logo">
+            <h1>ХЗР</h1>
+            <p>звёздная рельса</p>
+        </div>
+        <div class="user-info">
+            <span id="usernameDisplay"></span>
+            <span>💎 <span id="rublesDisplay">0</span> руб</span>
+            <span>⭐ <span id="bonusDisplay">0</span> Доп баллов</span>
+            <button class="money-plus-btn" id="moneyPlusBtn">➕</button>
+            <button id="logoutBtn" class="logout-btn">🚪 Выйти</button>
+        </div>
+    </div>
+
+    <div class="nav">
+        <button class="nav-btn active" data-tab="main">Главная</button>
+        <button class="nav-btn" data-tab="banner">Покупка билетов</button>
+        <button class="nav-btn" data-tab="routes">Мои маршруты</button>
+        <button class="nav-btn" data-tab="editor">Редактор</button>
+    </div>
+
+    <!-- ГЛАВНАЯ -->
+    <div id="main" class="tab active">
+        <div class="event-banner-main">
+            <img src="images/event.jpeg" alt="Ивентовые персонажи" class="event-image" id="eventImage" onerror="this.src='https://placehold.co/1200x500/1e293b/f5b042?text=🇰🇿+КАЗАХСТАН+++🇨🇳+КИТАЙ&font=montserrat'">
+            <button class="goto-pull-btn" id="gotoPullBtn">🎫 Перейти к круткам →</button>
+        </div>
+    </div>
+
+    <!-- ПОКУПКА БИЛЕТОВ -->
+    <div id="banner" class="tab">
+        <h2 class="section-title">🎟️ Покупка билетов</h2>
+        
+        <!-- ПЕРЕКЛЮЧАТЕЛЬ SHOPPING / GAMBLING -->
+        <div class="mode-switch">
+            <button id="shoppingModeBtn" class="mode-btn active">🛍️ SHOPPING</button>
+            <button id="gamblingModeBtn" class="mode-btn">🎰 GAMBLING</button>
+        </div>
+        
+        <!-- SHOPPING МОД (только прямая покупка) -->
+        <div id="shoppingMode" class="mode-content active">
+            <h3>💰 Прямая покупка маршрутов</h3>
+            <div class="shop-routes-grid" id="shopRoutesGrid"></div>
+        </div>
+        
+        <!-- GAMBLING МОД (рулетка + ивентовый баннер + магазин за бонусы) -->
+        <div id="gamblingMode" class="mode-content">
+            <button class="pull-btn" id="pullBtn">🎲 КРУТИТЬ (100 руб)</button>
+            
+            <div id="rouletteContainer" class="roulette-container-inline" style="display: none;">
+                <div class="roulette-title-inline">⚡ КРУТИМ РУЛЕТКУ ⚡</div>
+                <div class="roulette-track-inline">
+                    <div class="roulette-glow-inline"></div>
+                    <div class="roulette-items-inline" id="rouletteItems"></div>
+                </div>
+            </div>
+            
+            <div id="pullResult" class="result-box"></div>
+            
+            <!-- ИВЕНТОВЫЙ БАННЕР (только в GAMBLING) -->
+            <div class="event-section">
+                <h3>🌟 Ивентовый баннер</h3>
+                <div class="char-grid" id="bannerChars"></div>
+            </div>
+            
+            <!-- МАГАЗИН ЗА ДОП БАЛЛЫ (только в GAMBLING) -->
+            <div class="shop-section">
+                <h3 class="shop-title">🛍️ Магазин за Доп баллы</h3>
+                <div class="shop-buttons">
+                    <button class="shop-btn" id="buyPullBtn">🎫 Купить крутку (50 баллов)</button>
+                </div>
+                <div id="shopCharacters"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОИ МАРШРУТЫ -->
+    <div id="routes" class="tab">
+        <h2 class="section-title">🗺️ Мои маршруты</h2>
+        <div id="myCharacters" class="char-grid"></div>
+
+        <h2 class="section-title" style="margin-top: 40px;">📦 Не в коллекции</h2>
+        <div id="archiveList" class="char-grid"></div>
+
+        <h2 class="section-title" style="margin-top: 40px;">📜 История круток</h2>
+        <div id="historyList" class="history-list"></div>
+    </div>
+
+    <!-- РЕДАКТОР ПЕРСОНАЖЕЙ -->
+    <div id="editor" class="tab">
+        <h2 class="section-title">✏️ Редактор персонажей</h2>
+        
+        <div class="editor-card">
+            <h3>➕ Добавить новый маршрут</h3>
+            
+            <div class="editor-form">
+                <input type="text" id="charName" placeholder="Название маршрута" class="auth-input">
+                
+                <select id="charRarity" class="auth-input">
+                    <option value="common">📍 Редкий (common)</option>
+                    <option value="epic">⭐ Эпический (epic)</option>
+                    <option value="legendary">🌟 Легендарный (legendary)</option>
+                </select>
+                
+                <select id="charType" class="auth-input">
+                    <option value="event">Ивентовый</option>
+                    <option value="standard">Стандартный</option>
+                </select>
+            </div>
+            
+            <div class="image-upload-block">
+                <label class="upload-btn">
+                    📸 Выбрать изображение для маршрута
+                    <input type="file" id="charImage" accept="image/jpeg,image/png,image/gif,image/webp" class="char-image-input">
+                </label>
+                <p class="upload-hint">Поддерживаются JPG, PNG, GIF. Максимум 2 МБ</p>
+                <div id="imagePreview" class="image-preview"></div>
+            </div>
+            
+            <button id="addCharBtn" class="submit-btn">➕ Добавить маршрут</button>
+        </div>
+        
+        <h3 style="margin-top: 30px;">📋 Список всех маршрутов</h3>
+        <div id="adminCharList" class="char-list"></div>
+    </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО КЛИКЕРА -->
+<div id="clickerModal" class="clicker-modal" style="display: none;">
+    <div class="clicker-modal-content">
+        <div class="clicker-header">
+            <h2>💰 ЗАРАБОТАТЬ ДЕНЬГИ</h2>
+            <button class="clicker-close" id="clickerCloseBtn">✕</button>
+        </div>
+        <div class="clicker-body">
+            <img src="/images/money.jpg" id="moneyImage" class="money-image" alt="Money" onerror="this.src='https://placehold.co/300x300/10b981/1a1a2e?text=💰'">
+            <p class="clicker-hint">Нажми на монетку, чтобы получить 50 рублей!</p>
+            <div class="clicker-stats">
+                <span>💰 Кликов: <span id="clickCount">0</span></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
