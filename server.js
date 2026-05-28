@@ -2,15 +2,13 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const session = require('express-session');
-const path = require('path');
-
 
 const app = express();
 const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
     database: 'hsr_railway',
-    password: 'Matvey', // ЗАМЕНИТЕ НА ВАШ ПАРОЛЬ!
+    password: 'ваш_пароль', // ЗАМЕНИТЕ НА ВАШ ПАРОЛЬ!
     port: 5432,
 });
 
@@ -223,3 +221,93 @@ app.post('/api/buy', async (req, res) => {
 app.get('/api/my-characters', async (req, res) => {
     if (!req.session.userId) return res.json({ success: false });
     const chars = await pool.query(`
+        SELECT c.*, uc.constellation 
+        FROM public.user_characters uc
+        JOIN public.characters c ON uc.character_id = c.id
+        WHERE uc.user_id=$1
+    `, [req.session.userId]);
+    res.json({ success: true, characters: chars.rows });
+});
+
+// API АРХИВ (неполученные персонажи)
+app.get('/api/archive', async (req, res) => {
+    if (!req.session.userId) return res.json({ success: false });
+    const all = await pool.query('SELECT * FROM public.characters');
+    const my = await pool.query('SELECT character_id FROM public.user_characters WHERE user_id=$1', [req.session.userId]);
+    const myIds = my.rows.map(r => r.character_id);
+    const missing = all.rows.filter(c => !myIds.includes(c.id));
+    res.json({ success: true, characters: missing });
+});
+
+// API ИСТОРИЯ КРУТОК
+app.get('/api/history', async (req, res) => {
+    if (!req.session.userId) return res.json({ success: false });
+    const hist = await pool.query(`
+        SELECT ph.pull_number, ph.pulled_at, c.name, c.rarity 
+        FROM public.pull_history ph
+        JOIN public.characters c ON ph.character_id = c.id
+        WHERE ph.user_id=$1 ORDER BY ph.pulled_at DESC
+    `, [req.session.userId]);
+    res.json({ success: true, history: hist.rows });
+});
+
+// API АДМИНКА (получить всех персонажей)
+app.get('/api/admin/characters', async (req, res) => {
+    const chars = await pool.query('SELECT * FROM public.characters');
+    res.json(chars.rows);
+});
+
+// API АДМИНКА (добавить персонажа)
+app.post('/api/admin/characters', async (req, res) => {
+    const { name, rarity, type, description, image_url } = req.body;
+    await pool.query(
+        'INSERT INTO public.characters (name, rarity, type, description, image_url) VALUES ($1,$2,$3,$4,$5)', 
+        [name, rarity, type, description || '', image_url || '']
+    );
+    res.json({ success: true });
+});
+
+// API УДАЛЕНИЕ ПЕРСОНАЖА (с каскадным удалением)
+app.delete('/api/admin/characters/:id', async (req, res) => {
+    const characterId = req.params.id;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        await client.query('DELETE FROM public.pull_history WHERE character_id = $1', [characterId]);
+        await client.query('DELETE FROM public.user_characters WHERE character_id = $1', [characterId]);
+        const result = await client.query('DELETE FROM public.characters WHERE id = $1 RETURNING id', [characterId]);
+        
+        if (result.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.json({ success: false, error: 'Маршрут не найден' });
+        }
+        
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Маршрут и все связанные данные удалены' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Ошибка удаления:', error);
+        res.json({ success: false, error: error.message });
+    } finally {
+        client.release();
+    }
+});
+
+// API ПОЛУЧИТЬ ИНФОРМАЦИЮ О ПЕРСОНАЖЕ (для модального окна)
+app.get('/api/characters/:id', async (req, res) => {
+    try {
+        const character = await pool.query('SELECT * FROM public.characters WHERE id = $1', [req.params.id]);
+        if (character.rows.length === 0) {
+            return res.json({ success: false, error: 'Маршрут не найден' });
+        }
+        res.json({ success: true, character: character.rows[0] });
+    } catch (error) {
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// ЗАПУСК
+initDB().then(() => {
+    app.listen(3000, () => console.log('🚆 Сервер запущен на http://localhost:3000'));
+});
