@@ -94,12 +94,14 @@ async function loadAllData() {
     renderShop();
 }
 
-// Получение картинки (единая функция для всех картинок)
+// Получение картинки персонажа (поддерживает base64 из БД)
 function getCharacterImage(char) {
+    // Приоритет: сначала пробуем взять из БД
     if (char.image_url && char.image_url !== '' && char.image_url !== null) {
         return char.image_url;
     }
     
+    // Прямые пути к картинкам в папке images
     const images = {
         'Казахстан': '/images/kazakhstan.png',
         'Китай': '/images/china.png',
@@ -122,14 +124,8 @@ function getCharacterImage(char) {
         return images[char.name];
     }
     
-    const colors = {
-        'legendary': 'f5b042',
-        'epic': 'a855f7',
-        'common': '3b82f6'
-    };
-    const color = colors[char.rarity] || '6b7280';
-    const text = char.name ? char.name.substring(0, 2) : '??';
-    return `https://placehold.co/200x200/${color}/1a1a2e?text=${encodeURIComponent(text)}&font=montserrat`;
+    // Fallback
+    return 'https://placehold.co/200x200/334155/f5b042?text=🚆';
 }
 
 // Мои персонажи
@@ -144,7 +140,7 @@ async function loadMyCharacters() {
                 <div class="char-card">
                     <img src="${getCharacterImage(c)}" class="char-avatar" onerror="this.src='https://placehold.co/200x200/334155/f5b042?text=🚆'">
                     <div class="char-name">${c.name}</div>
-                    <div class="char-rarity">${c.rarity === 'legendary' ? '🌟 Легендарный' : c.rarity === 'epic' ? '⭐ Эпический' : '📍 Редкий'}</div>
+                    <div class="char-rarity">${c.rarity === 'legendary' ? '⭐⭐⭐⭐⭐' : c.rarity === 'epic' ? '⭐⭐⭐⭐' : '⭐⭐⭐'}</div>
                     <div class="const-progress">Посадочных мест: ${c.constellation}/8</div>
                     ${c.constellation >= 8 ? '<div class="badge">✨ Бизнес класс</div>' : ''}
                 </div>
@@ -165,7 +161,7 @@ async function loadArchive() {
                 <div class="char-card archive-card">
                     <img src="${getCharacterImage(c)}" class="char-avatar" onerror="this.src='https://placehold.co/200x200/334155/f5b042?text=❓'">
                     <div class="char-name">${c.name}</div>
-                    <div class="char-rarity">${c.rarity === 'legendary' ? '🌟' : c.rarity === 'epic' ? '⭐' : '📍'} ${c.rarity}</div>
+                    <div class="char-rarity">${c.rarity === 'legendary' ? '⭐⭐⭐⭐⭐' : c.rarity === 'epic' ? '⭐⭐⭐⭐' : '⭐⭐⭐'} ${c.rarity}</div>
                     <button class="shop-btn" onclick="buyCharacter(${c.id})" style="margin-top: 8px;">Купить за 200 бонусов</button>
                 </div>
             `).join('');
@@ -232,7 +228,7 @@ async function loadShopRoutes() {
             <div class="shop-route-card">
                 <img src="${getCharacterImage(char)}" onerror="this.src='https://placehold.co/200x200/334155/f5b042?text=🚆'">
                 <div class="char-name">${char.name}</div>
-                <div class="char-rarity">${char.rarity === 'legendary' ? '🌟' : char.rarity === 'epic' ? '⭐' : '📍'} ${char.rarity}</div>
+                <div class="char-rarity">${char.rarity === 'legendary' ? '⭐⭐⭐⭐⭐' : char.rarity === 'epic' ? '⭐⭐⭐⭐' : '⭐⭐⭐'} ${char.rarity}</div>
                 <div class="shop-route-price">${prices[char.rarity]} <span>руб</span></div>
                 <button class="buy-route-btn" onclick="buyRouteDirect(${char.id}, '${char.name}', ${prices[char.rarity]})">💰 Купить билет</button>
             </div>
@@ -310,10 +306,8 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
     pullBtn.style.opacity = '0.6';
     pullBtn.style.cursor = 'not-allowed';
     
-    // Очищаем предыдущий результат
     document.getElementById('pullResult').innerHTML = '';
     
-    // Получаем всех персонажей
     const allCharsRes = await api('/api/admin/characters');
     const allCharacters = allCharsRes;
     
@@ -327,7 +321,6 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
         return;
     }
     
-    // Делаем запрос на крутку
     const pullResult = await api('/api/pull', { method: 'POST', body: JSON.stringify({}) });
     
     if (!pullResult.success) {
@@ -340,24 +333,20 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
         return;
     }
     
-    // Показываем контейнер рулетки
     const rouletteContainer = document.getElementById('rouletteContainer');
     const rouletteItemsDiv = document.getElementById('rouletteItems');
     rouletteContainer.style.display = 'block';
     
-    // Создаём массив для анимации (дублируем много раз)
     let rouletteItemsArray = [];
     for (let i = 0; i < 25; i++) {
         rouletteItemsArray.push(...allCharacters);
     }
     
-    // Перемешиваем
     for (let i = rouletteItemsArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [rouletteItemsArray[i], rouletteItemsArray[j]] = [rouletteItemsArray[j], rouletteItemsArray[i]];
     }
     
-    // Заполняем контейнер
     rouletteItemsDiv.innerHTML = '';
     rouletteItemsArray.forEach(char => {
         const item = document.createElement('div');
@@ -365,12 +354,11 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
         item.innerHTML = `
             <img src="${getCharacterImage(char)}" onerror="this.src='https://placehold.co/150x100/334155/f5b042?text=🚆'">
             <div class="roulette-item-name-inline">${char.name}</div>
-            <div class="roulette-item-rarity-inline">${char.rarity === 'legendary' ? '🌟' : char.rarity === 'epic' ? '⭐' : '📍'}</div>
+            <div class="roulette-item-rarity-inline">${char.rarity === 'legendary' ? '⭐⭐⭐⭐⭐' : char.rarity === 'epic' ? '⭐⭐⭐⭐' : '⭐⭐⭐'}</div>
         `;
         rouletteItemsDiv.appendChild(item);
     });
     
-    // Находим индекс выпавшего персонажа
     let targetIndex = -1;
     for (let i = 0; i < rouletteItemsArray.length; i++) {
         if (rouletteItemsArray[i].name === pullResult.character.name) {
@@ -379,7 +367,6 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
         }
     }
     
-    // Принудительно пересчитываем layout
     rouletteItemsDiv.offsetHeight;
     
     const scrollContainer = rouletteItemsDiv;
@@ -387,20 +374,16 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
     const containerWidth = scrollContainer.clientWidth;
     const centerOffset = (containerWidth / 2) - (itemWidth / 2);
     
-    // Начинаем с позиции 0
     scrollContainer.scrollLeft = 0;
     
-    // Целевая позиция
     let targetPosition = targetIndex * itemWidth - centerOffset;
     if (targetPosition < 0) targetPosition = 0;
     
-    // Параметры анимации
     const startPosition = 0;
     const distance = targetPosition - startPosition;
-    const duration = 2200; // 2.2 секунды
+    const duration = 2200;
     const startTime = performance.now();
     
-    // Функция замедления: быстрый старт, плавная остановка
     function easeOutCubic(x) {
         return 1 - Math.pow(1 - x, 3);
     }
@@ -408,8 +391,6 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
     function animateScroll(now) {
         const elapsed = now - startTime;
         let progress = Math.min(1, elapsed / duration);
-        
-        // Применяем замедление
         const easedProgress = easeOutCubic(progress);
         const currentPosition = startPosition + distance * easedProgress;
         scrollContainer.scrollLeft = currentPosition;
@@ -417,9 +398,7 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
         if (progress < 1) {
             requestAnimationFrame(animateScroll);
         } else {
-            // Финальная доводка для точности
             scrollContainer.scrollLeft = targetPosition;
-            
             setTimeout(() => {
                 rouletteContainer.style.display = 'none';
                 document.getElementById('pullResult').innerHTML = `
@@ -430,17 +409,15 @@ document.getElementById('pullBtn')?.addEventListener('click', async () => {
                     ⭐ +10 Доп баллов
                 `;
                 loadAllData();
-                
                 isPulling = false;
                 pullBtn.textContent = originalBtnText;
                 pullBtn.disabled = false;
                 pullBtn.style.opacity = '1';
                 pullBtn.style.cursor = 'pointer';
-            }, 100);
+            }, 300);
         }
     }
     
-    // Запускаем анимацию
     requestAnimationFrame(animateScroll);
 });
 
@@ -531,6 +508,7 @@ document.getElementById('addCharBtn')?.addEventListener('click', async () => {
     const name = document.getElementById('charName').value.trim();
     const rarity = document.getElementById('charRarity').value;
     const type = document.getElementById('charType').value;
+    const description = document.getElementById('charDescription')?.value.trim() || '';
     
     if (!name) {
         alert('Введите название маршрута');
@@ -550,6 +528,7 @@ document.getElementById('addCharBtn')?.addEventListener('click', async () => {
                 name, 
                 rarity, 
                 type, 
+                description,
                 image_url: currentImagePreview || '' 
             })
         });
@@ -559,6 +538,7 @@ document.getElementById('addCharBtn')?.addEventListener('click', async () => {
         if (result.success) {
             alert(`✅ Маршрут "${name}" добавлен!`);
             document.getElementById('charName').value = '';
+            document.getElementById('charDescription').value = '';
             document.getElementById('charRarity').value = 'common';
             document.getElementById('charType').value = 'none';
             document.getElementById('charImage').value = '';
@@ -590,7 +570,7 @@ async function loadAdminChars() {
             container.innerHTML = chars.map(c => `
                 <div class="char-item">
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <img src="${c.image_url || getCharacterImage(c)}" 
+                        <img src="${c.image_url && c.image_url !== '' ? c.image_url : getCharacterImage(c)}" 
                              onerror="this.src='https://placehold.co/50x50/334155/f5b042?text=🚆'">
                         <div>
                             <strong>${c.name}</strong><br>
@@ -598,6 +578,7 @@ async function loadAdminChars() {
                                 ${c.rarity === 'legendary' ? '🌟' : c.rarity === 'epic' ? '⭐' : '📍'} ${c.rarity}
                                 ${c.type === 'event' ? ' | Ивент' : c.type === 'standard' ? ' | Стандарт' : ''}
                             </span>
+                            ${c.description ? `<br><span style="font-size: 0.7rem; color: #94a3b8;">📝 ${c.description.substring(0, 50)}${c.description.length > 50 ? '...' : ''}</span>` : ''}
                         </div>
                     </div>
                     <button class="delete-char-btn" onclick="deleteChar(${c.id})">🗑️ Удалить</button>

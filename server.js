@@ -2,13 +2,15 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const session = require('express-session');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
     database: 'hsr_railway',
-    password: 'ваш_пароль', // ЗАМЕНИТЕ НА ВАШ ПАРОЛЬ!
+    password: 'Matvey', // ЗАМЕНИТЕ НА ВАШ ПАРОЛЬ!
     port: 5432,
 });
 
@@ -17,6 +19,94 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(session({ secret: 'hsr_secret', resave: false, saveUninitialized: true }));
 app.use(express.static('public'));
+
+// Вспомогательная функция для определения MIME типа
+function getMimeType(filename) {
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp'
+    };
+    return mimeTypes[ext] || 'image/png';
+}
+
+// Функция для привязки картинок из папки images к маршрутам в БД
+async function bindImagesToCharacters() {
+    try {
+        console.log('🖼️ Начинаем привязку картинок к маршрутам...');
+        
+        const imagesPath = path.join(__dirname, 'public', 'images');
+        
+        if (!fs.existsSync(imagesPath)) {
+            console.log('❌ Папка public/images не найдена!');
+            return;
+        }
+        
+        const files = fs.readdirSync(imagesPath);
+        const imageFiles = files.filter(file => file.match(/\.(png|jpg|jpeg|gif|webp)$/i));
+        
+        console.log(`📁 Найдено ${imageFiles.length} картинок в папке images`);
+        
+        const nameMapping = {
+            'china': 'Китай',
+            'kazakhstan': 'Казахстан',
+            'moscow': 'Москва',
+            'vladivostok': 'Владивосток',
+            'minsk': 'Минск',
+            'spb': 'Санкт-Петербург',
+            'samara': 'Самара',
+            'rostov': 'Ростов',
+            'astrakhan': 'Астрахань',
+            'kazan': 'Казань',
+            'voronezh': 'Воронеж',
+            'ryazan': 'Рязань',
+            'kursk': 'Курск',
+            'volgograd': 'Волгоград',
+            'saratov': 'Саратов'
+        };
+        
+        let updatedCount = 0;
+        
+        for (const imageFile of imageFiles) {
+            const fileNameWithoutExt = path.parse(imageFile).name.toLowerCase();
+            const characterName = nameMapping[fileNameWithoutExt];
+            
+            if (!characterName) {
+                console.log(`⚠️ Нет привязки для файла: ${imageFile}`);
+                continue;
+            }
+            
+            const imagePath = path.join(imagesPath, imageFile);
+            const imageBuffer = fs.readFileSync(imagePath);
+            const mimeType = getMimeType(imageFile);
+            const base64Image = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
+            
+            const result = await pool.query(
+                'UPDATE public.characters SET image_url = $1 WHERE name = $2 AND (image_url IS NULL OR image_url = \'\') RETURNING id, name',
+                [base64Image, characterName]
+            );
+            
+            if (result.rows.length > 0) {
+                console.log(`✅ Привязана картинка для: ${characterName} (${imageFile})`);
+                updatedCount++;
+            } else {
+                const exists = await pool.query('SELECT id FROM public.characters WHERE name = $1', [characterName]);
+                if (exists.rows.length === 0) {
+                    console.log(`❌ Маршрут "${characterName}" не найден в БД`);
+                } else {
+                    console.log(`ℹ️ У маршрута "${characterName}" уже есть картинка, пропускаем`);
+                }
+            }
+        }
+        
+        console.log(`✅ Привязка завершена! Обновлено ${updatedCount} маршрутов.`);
+    } catch (error) {
+        console.error('❌ Ошибка при привязке картинок:', error);
+    }
+}
 
 // ИНИЦИАЛИЗАЦИЯ БД
 async function initDB() {
@@ -229,7 +319,7 @@ app.get('/api/my-characters', async (req, res) => {
     res.json({ success: true, characters: chars.rows });
 });
 
-// API АРХИВ (неполученные персонажи)
+// API АРХИВ
 app.get('/api/archive', async (req, res) => {
     if (!req.session.userId) return res.json({ success: false });
     const all = await pool.query('SELECT * FROM public.characters');
@@ -239,7 +329,7 @@ app.get('/api/archive', async (req, res) => {
     res.json({ success: true, characters: missing });
 });
 
-// API ИСТОРИЯ КРУТОК
+// API ИСТОРИЯ
 app.get('/api/history', async (req, res) => {
     if (!req.session.userId) return res.json({ success: false });
     const hist = await pool.query(`
@@ -264,6 +354,13 @@ app.post('/api/admin/characters', async (req, res) => {
         'INSERT INTO public.characters (name, rarity, type, description, image_url) VALUES ($1,$2,$3,$4,$5)', 
         [name, rarity, type, description || '', image_url || '']
     );
+    res.json({ success: true });
+});
+
+// API АДМИНКА (обновить картинку персонажа)
+app.put('/api/admin/characters/:id/image', async (req, res) => {
+    const { image_url } = req.body;
+    await pool.query('UPDATE public.characters SET image_url = $1 WHERE id = $2', [image_url, req.params.id]);
     res.json({ success: true });
 });
 
@@ -294,7 +391,7 @@ app.delete('/api/admin/characters/:id', async (req, res) => {
     }
 });
 
-// API ПОЛУЧИТЬ ИНФОРМАЦИЮ О ПЕРСОНАЖЕ (для модального окна)
+// API ПОЛУЧИТЬ ИНФОРМАЦИЮ О ПЕРСОНАЖЕ
 app.get('/api/characters/:id', async (req, res) => {
     try {
         const character = await pool.query('SELECT * FROM public.characters WHERE id = $1', [req.params.id]);
@@ -308,6 +405,7 @@ app.get('/api/characters/:id', async (req, res) => {
 });
 
 // ЗАПУСК
-initDB().then(() => {
+initDB().then(async () => {
+    await bindImagesToCharacters();
     app.listen(3000, () => console.log('🚆 Сервер запущен на http://localhost:3000'));
 });
